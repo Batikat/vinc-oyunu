@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Vinç Oyunu — LED Ekran</title>
+<style>
+  :root { --qr: 15vmin; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #05050a; overflow: hidden; cursor: none; font-family: "Arial Black", "Helvetica Neue", Arial, sans-serif; }
+  canvas#c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  #hud { position: fixed; inset: 0; pointer-events: none; }
+
+  /* QR kartı — videodaki gibi topların önünde, ortada */
+  #join { position: fixed; left: 50%; bottom: 5.5vh; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 1.1vmin; transition: opacity .5s; text-align: center; }
+  body.noqr #join { opacity: 0; }
+  #qrimg { width: var(--qr); height: var(--qr); background: #fff; border-radius: 1.2vmin; padding: .4vmin; box-shadow: 0 1.5vmin 4vmin rgba(20, 10, 60, .45), 0 0 0 .35vmin rgba(255, 255, 255, .6); }
+  #qrimg svg { width: 100%; height: 100%; display: block; }
+  #jointext { color: #fff; font: 700 clamp(14px, 2.1vmin, 40px)/1.2 "Helvetica Neue", Arial, sans-serif; max-width: 34vmin; text-shadow: 0 .3vmin 1.2vmin rgba(30, 10, 80, .8); }
+  #brand { color: #fff; font-size: clamp(22px, 4.6vmin, 90px); letter-spacing: -.02em; line-height: .9; text-shadow: 0 .4vmin 2vmin rgba(40, 10, 90, .7); }
+  #qrurl { color: rgba(255, 255, 255, .7); font: 600 clamp(10px, 1.2vmin, 22px) "Helvetica Neue", Arial, sans-serif; }
+  #queue { position: fixed; right: 3vmin; top: 3vmin; padding: 1vmin 2vmin; border-radius: 99px; background: rgba(255, 255, 255, .88); color: #2a2050; font-size: clamp(13px, 2vmin, 36px); opacity: 0; transition: opacity .4s; }
+
+  /* pençe yanındaki geri sayım halkası */
+  .hud { position: absolute; left: 0; top: 0; width: 6.4vmin; height: 6.4vmin; transition: opacity .3s; }
+  .hud svg { position: absolute; inset: 0; transform: rotate(-90deg); filter: drop-shadow(0 0 .8vmin var(--c)); }
+  .hud circle { fill: none; stroke-width: 3.6; }
+  .hud .bg { stroke: rgba(255, 255, 255, .25); }
+  .hud .fg { stroke: var(--c); stroke-dasharray: 100; stroke-linecap: round; transition: stroke-dashoffset .25s linear; }
+  .hud b { position: absolute; inset: 0; display: grid; place-items: center; color: var(--c); font-size: 2.6vmin; text-shadow: 0 0 1vmin var(--c); }
+  .hud .nm { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); margin-top: .4vmin; white-space: nowrap; color: #fff; font-size: 1.6vmin; text-shadow: 0 0 .8vmin rgba(0, 0, 0, .6); }
+
+  .pop { position: absolute; transform: translate(-50%, -120%); text-align: center; white-space: nowrap; animation: pop 2.6s cubic-bezier(.2, .9, .3, 1.3) forwards; }
+  .pop strong { display: block; font-size: 4vmin; color: #fff; text-shadow: 0 0 2vmin var(--c), 0 .4vmin 0 rgba(0, 0, 0, .25); }
+  .pop.win strong { font-size: 7vmin; color: var(--c); text-shadow: 0 0 3vmin var(--c), 0 0 .6vmin #fff; }
+  .pop em { display: block; font-style: normal; font-size: 3vmin; color: #fff; text-shadow: 0 0 1.5vmin rgba(0, 0, 0, .5); }
+  @keyframes pop { 0% { opacity: 0; transform: translate(-50%, -60%) scale(.4); } 12% { opacity: 1; transform: translate(-50%, -130%) scale(1.08); } 80% { opacity: 1; transform: translate(-50%, -150%) scale(1); } 100% { opacity: 0; transform: translate(-50%, -175%) scale(.95); } }
+
+  #dbg { position: fixed; left: 10px; bottom: 8px; color: #fff; font: 12px monospace; opacity: .7; }
+  #offline { position: fixed; left: 50%; top: 2vmin; transform: translateX(-50%); color: #fff; background: rgba(200, 30, 60, .85); padding: .8vmin 1.6vmin; border-radius: 99px; font: 700 clamp(12px, 1.6vmin, 24px) Arial, sans-serif; }
+  body.online #offline { display: none; }
+  @media (prefers-reduced-motion: reduce) { .pop { animation-duration: .01s; } }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud"></div>
+<div id="join">
+  <div id="qrimg"></div>
+  <div id="jointext"></div>
+  <div id="brand"></div>
+  <div id="qrurl"></div>
+</div>
+<div id="queue"></div>
+<div id="offline">Sunucu bağlantısı yok — telefonlar bağlanamaz (T: klavye ile test)</div>
+<div id="dbg"></div>
+<script src="js/qr.js"></script>
+<script src="js/gl.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>

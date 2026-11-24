@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#eceefa">
+<link rel="icon" href="data:,">
+<title>Vinç Kumandası</title>
+<style>
+  :root { --c: #3d6bff; --bg: #eceefa; --ink: #1c1838; --soft: #8a87a8; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 16px/1.4 -apple-system, "Segoe UI", Roboto, Arial, sans-serif; overflow: hidden; touch-action: none; }
+  body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  .view { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 24px; text-align: center; }
+  .view.on { display: flex; }
+  h1 { margin: 0; font: 900 clamp(30px, 9vw, 48px)/1 "Arial Black", Arial, sans-serif; letter-spacing: -.02em; }
+  h2 { margin: 0; font-size: 24px; }
+  p { margin: 0; color: var(--soft); max-width: 30ch; }
+  .dot { width: 14px; height: 14px; border-radius: 50%; background: var(--c); display: inline-block; box-shadow: 0 0 12px var(--c); }
+  input { font: 600 18px Arial, sans-serif; padding: 14px 18px; border-radius: 16px; border: 2px solid #d6d6ea; background: #fff; width: min(300px, 80vw); text-align: center; color: var(--ink); user-select: text; -webkit-user-select: text; }
+  input:focus { outline: none; border-color: var(--c); }
+  .big { font: 900 26px "Arial Black", Arial, sans-serif; color: #fff; background: linear-gradient(180deg, #5b86ff, #2a4fe0); border: 0; border-radius: 22px; padding: 20px 54px; box-shadow: 0 8px 0 #1c36a8, 0 14px 28px rgba(40, 60, 200, .35); cursor: pointer; }
+  .big:active { transform: translateY(6px); box-shadow: 0 2px 0 #1c36a8, 0 6px 14px rgba(40, 60, 200, .3); }
+  .big:focus-visible { outline: 3px solid var(--ink); outline-offset: 4px; }
+  .spinner { width: 46px; height: 46px; border-radius: 50%; border: 5px solid #d6d6ea; border-top-color: var(--c); animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* oyun ekranı */
+  #play { justify-content: space-between; padding: 18px 22px 26px; }
+  .top { display: flex; align-items: center; gap: 14px; width: 100%; justify-content: center; }
+  .timer { position: relative; width: 92px; height: 92px; }
+  .timer svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+  .timer circle { fill: none; stroke-width: 9; }
+  .timer .bg { stroke: #d9daef; }
+  .timer .fg { stroke: var(--c); stroke-linecap: round; stroke-dasharray: 100; transition: stroke-dashoffset 1s linear; }
+  .timer b { position: absolute; inset: 0; display: grid; place-items: center; font: 900 34px "Arial Black", Arial, sans-serif; color: var(--ink); }
+  #status { font-weight: 700; color: var(--soft); min-height: 1.4em; }
+  .pad { display: flex; align-items: center; justify-content: space-around; width: 100%; gap: 20px; flex: 1; max-height: 420px; }
+  .dpad { position: relative; width: min(60vw, 230px, 42vh); aspect-ratio: 1; touch-action: none; }
+  .dpad .arm { position: absolute; background: linear-gradient(180deg, color-mix(in srgb, var(--c) 80%, #fff), var(--c)); border-radius: 18px; box-shadow: 0 7px 0 color-mix(in srgb, var(--c) 60%, #000), 0 14px 24px color-mix(in srgb, var(--c) 35%, transparent); }
+  .dpad .h { left: 0; right: 0; top: 33.3%; height: 33.4%; }
+  .dpad .v { top: 0; bottom: 0; left: 33.3%; width: 33.4%; }
+  .dpad .center { position: absolute; left: 33.3%; top: 33.3%; width: 33.4%; height: 33.4%; background: linear-gradient(180deg, color-mix(in srgb, var(--c) 80%, #fff), var(--c)); }
+  .dpad .ar { position: absolute; width: 0; height: 0; border: 11px solid transparent; opacity: .9; }
+  .dpad .u { left: 50%; top: 9%; transform: translateX(-50%); border-bottom: 14px solid #fff; border-top: 0; }
+  .dpad .d { left: 50%; bottom: 9%; transform: translateX(-50%); border-top: 14px solid #fff; border-bottom: 0; }
+  .dpad .l { top: 50%; left: 9%; transform: translateY(-50%); border-right: 14px solid #fff; border-left: 0; }
+  .dpad .r { top: 50%; right: 9%; transform: translateY(-50%); border-left: 14px solid #fff; border-right: 0; }
+  .dpad .knob { position: absolute; left: 50%; top: 50%; width: 22%; height: 22%; margin: -11% 0 0 -11%; border-radius: 50%; background: rgba(255, 255, 255, .85); box-shadow: 0 3px 8px rgba(0, 0, 0, .2); transition: transform .08s; }
+  .dpad.press .arm, .dpad.press .center { filter: brightness(1.08); }
+  .grab { position: relative; width: min(34vw, 150px, 30vh); aspect-ratio: 1; border: 0; background: none; padding: 0; touch-action: none; cursor: pointer; }
+  .grab .gem { position: absolute; inset: 12%; border-radius: 28%; transform: rotate(45deg); background: linear-gradient(135deg, color-mix(in srgb, var(--c) 55%, #fff), var(--c) 55%, color-mix(in srgb, var(--c) 70%, #000)); box-shadow: 0 9px 0 color-mix(in srgb, var(--c) 55%, #000), 0 18px 30px color-mix(in srgb, var(--c) 40%, transparent); transition: transform .08s, box-shadow .08s; }
+  .grab span { position: absolute; inset: 0; display: grid; place-items: center; color: #fff; font: 900 20px "Arial Black", Arial, sans-serif; text-shadow: 0 2px 0 rgba(0, 0, 0, .25); }
+  .grab.press .gem { transform: rotate(45deg) translate(4px, 4px); box-shadow: 0 2px 0 color-mix(in srgb, var(--c) 55%, #000); }
+  #play.locked .pad { opacity: .35; pointer-events: none; }
+
+  .prize { font: 900 30px "Arial Black", Arial, sans-serif; color: var(--c); }
+  .code { background: #fff; border-radius: 16px; padding: 12px 22px; font-weight: 700; box-shadow: 0 6px 18px rgba(30, 20, 80, .08); }
+  .code b { font: 900 30px "Arial Black", monospace; letter-spacing: .12em; color: var(--ink); display: block; }
+  #confetti { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+  #confetti i { position: absolute; top: -20px; width: 10px; height: 16px; border-radius: 2px; animation: fall linear forwards; }
+  @keyframes fall { to { transform: translateY(110vh) rotate(720deg); } }
+  @media (orientation: landscape) and (max-height: 500px) { #play { flex-direction: row; } .top { flex-direction: column; width: auto; } .timer { width: 74px; height: 74px; } }
+  @media (prefers-reduced-motion: reduce) { #confetti { display: none; } .spinner { animation-duration: 3s; } }
+</style>
+</head>
+<body>
+<div class="view on" id="v-connecting"><div class="spinner"></div><p id="conntext">Bağlanıyor…</p></div>
+<div class="view" id="v-idle">
+  <span class="dot"></span>
+  <h1 id="title">LUCKY CLAW</h1>
+  <p>15 saniyen var: pençeni topun üstüne getir, yakala ve ödülü kap!</p>
+  <input id="name" maxlength="14" placeholder="Adın (isteğe bağlı)" autocomplete="off">
+  <button class="big" id="joinBtn">OYNA</button>
+</div>
+<div class="view" id="v-queue"><div class="spinner"></div><h2>Sıradasın</h2><h1 id="qpos">1</h1><p>Sıran gelince pençen ekrana inecek. Bu sayfayı kapatma.</p></div>
+<div class="view" id="v-play">
+  <div class="top">
+    <div class="timer"><svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="18" class="bg"/><circle cx="22" cy="22" r="18" class="fg" id="ring" pathLength="100"/></svg><b id="secs">15</b></div>
+    <div id="status">Pençen geliyor…</div>
+  </div>
+  <div class="pad">
+    <div class="dpad" id="dpad" aria-label="Yön tuşları"><div class="arm h"></div><div class="arm v"></div><div class="center"></div><i class="ar u"></i><i class="ar d"></i><i class="ar l"></i><i class="ar r"></i><div class="knob" id="knob"></div></div>
+    <button class="grab" id="grab" aria-label="Yakala"><div class="gem"></div><span>YAKALA</span></button>
+  </div>
+</div>
+<div class="view" id="v-drop"><div class="spinner"></div><h2>Pençe iniyor…</h2><p>Ekrana bak!</p></div>
+<div class="view" id="v-result">
+  <h1 id="rtitle">KAZANDIN!</h1>
+  <div class="prize" id="rprize"></div>
+  <div class="code" id="rcode">Ödül kodun<b>0000</b>Bu ekranı görevliye göster</div>
+  <p id="rtext"></p>
+  <button class="big" id="againBtn">TEKRAR OYNA</button>
+</div>
+<div class="view" id="v-limit"><span class="dot"></span><h2>Oyun hakkın doldu</h2><p>Katıldığın için teşekkürler!</p></div>
+<div id="confetti"></div>
+<script>
+{
+  const $ = id => document.getElementById(id);
+  let pid = ''; try { pid = localStorage.getItem('claw_pid') || ''; } catch (e) { }
+  let ws, state = 'connecting', left = 15, total = 15, retry = 0, stopped = false;
+  const show = v => { state = v; document.querySelectorAll('.view').forEach(e => e.classList.toggle('on', e.id === 'v-' + v)); };
+  const send = o => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); };
+  const buzz = p => { try { navigator.vibrate && navigator.vibrate(p); } catch (e) { } };
+  try { $('name').value = localStorage.getItem('claw_name') || ''; } catch (e) { }
+
+  function connect() {
+    ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws?role=play&pid=' + encodeURIComponent(pid));
+    ws.onopen = () => { retry = 0; };
+    ws.onmessage = e => { let m; try { m = JSON.parse(e.data); } catch (_) { return; } onMsg(m); };
+    ws.onclose = () => { if (stopped) return; if (state !== 'result' && state !== 'limit') { show('connecting'); $('conntext').textContent = 'Bağlantı koptu, yeniden bağlanıyor…'; } setTimeout(connect, Math.min(4000, 600 * ++retry)); };
+  }
+  function onMsg(m) {
+    if (m.t === 'welcome') { pid = m.pid; try { localStorage.setItem('claw_pid', pid); } catch (e) { } if (!m.screen) { show('connecting'); $('conntext').textContent = 'Büyük ekran bekleniyor…'; } return; }
+    if (m.t === 'replaced') { stopped = true; show('connecting'); $('conntext').textContent = 'Oyun başka bir sekmede açıldı. Bu sekmeyi kapatabilirsin.'; document.querySelector('.spinner').style.display = 'none'; return; }
+    if (m.t === 'noscreen') { show('connecting'); $('conntext').textContent = 'Büyük ekran bekleniyor…'; return; }
+    if (m.t === 'reset' || m.t === 'idle') { if (state !== 'result') show('idle'); if (m.title) $('title').textContent = m.title; return; }
+    if (m.t === 'queue') { $('qpos').textContent = m.pos; show('queue'); return; }
+    if (m.t === 'limit') { if (state !== 'result') show('limit'); else $('againBtn').hidden = true; return; }
+    if (m.color) document.documentElement.style.setProperty('--c', m.color);
+    if (m.t === 'ready') { show('play'); $('v-play').classList.add('locked'); $('status').textContent = 'Pençen geliyor…'; setTimer(total, total); buzz(40); }
+    if (m.t === 'play') { total = m.seconds; show('play'); $('v-play').classList.remove('locked'); $('status').textContent = 'Topun üstüne getir, YAKALA!'; setTimer(m.seconds, total); buzz([30, 40, 30]); }
+    if (m.t === 'tick') { setTimer(m.left, total); if (m.left <= 3 && m.left > 0) buzz(25); }
+    if (m.t === 'drop') { stopMove(); show('drop'); }
+    if (m.t === 'result') {
+      $('rtitle').textContent = m.win ? (m.grand ? 'BÜYÜK ÖDÜL!' : 'KAZANDIN!') : (m.near ? 'Kıl payı!' : 'Olmadı!');
+      $('rprize').textContent = m.win ? m.prize : '';
+      $('rcode').hidden = !m.win; $('rcode').querySelector('b').textContent = m.code;
+      $('rtext').textContent = m.win ? '' : (m.near ? 'Top elinden kaydı. Bir daha dene!' : 'Pençe boş döndü. Şansını tekrar dene!');
+      $('againBtn').hidden = false;
+      show('result'); if (m.win) { confetti(); buzz([80, 60, 80, 60, 200]); } else buzz(120);
+    }
+  }
+  function setTimer(s, t) { left = s; $('secs').textContent = s; $('ring').style.strokeDashoffset = 100 - (s / t) * 100; }
+  function join() { const name = $('name').value.trim(); try { localStorage.setItem('claw_name', name); } catch (e) { } send({ t: 'join', name }); buzz(20); $('name').blur(); }
+  $('joinBtn').onclick = join;
+  $('name').onkeydown = e => { if (e.key === 'Enter') join(); };
+  $('againBtn').onclick = () => { show('idle'); join(); };
+
+  // yön pedi: basılı tutulan noktaya göre analog yön
+  const dpad = $('dpad'), knob = $('knob'); let padId = null, lx = 0, lz = 0, lastSent = 0;
+  function padMove(e) {
+    const r = dpad.getBoundingClientRect(), dx = (e.clientX - r.left - r.width / 2) / (r.width / 2), dy = (e.clientY - r.top - r.height / 2) / (r.height / 2);
+    let x = Math.max(-1, Math.min(1, dx * 1.6)), z = Math.max(-1, Math.min(1, dy * 1.6));
+    if (Math.abs(x) < .18) x = 0; if (Math.abs(z) < .18) z = 0;
+    setMove(x, z);
+  }
+  function setMove(x, z) {
+    knob.style.transform = `translate(${x * 120}%,${z * 120}%)`;
+    const now = performance.now(), changed = Math.abs(x - lx) > .05 || Math.abs(z - lz) > .05, toZero = x === 0 && z === 0 && (lx || lz);
+    cx = x; cz = z;
+    if (toZero || (changed && now - lastSent > 30)) { lx = x; lz = z; lastSent = now; send({ t: 'input', x, z }); }
+  }
+  let cx = 0, cz = 0;
+  function stopMove() { padId = null; dpad.classList.remove('press'); setMove(0, 0); }
+  dpad.addEventListener('pointerdown', e => { padId = e.pointerId; dpad.setPointerCapture(e.pointerId); dpad.classList.add('press'); padMove(e); buzz(8); });
+  dpad.addEventListener('pointermove', e => { if (e.pointerId === padId) padMove(e); });
+  dpad.addEventListener('pointerup', e => { if (e.pointerId === padId) stopMove(); });
+  dpad.addEventListener('pointercancel', stopMove);
+  setInterval(() => { if (cx !== lx || cz !== lz || cx || cz) { lx = cx; lz = cz; send({ t: 'input', x: cx, z: cz }); } }, 120);
+  const grab = $('grab');
+  grab.addEventListener('pointerdown', e => { e.preventDefault(); grab.classList.add('press'); if (state === 'play' && !$('v-play').classList.contains('locked')) { stopMove(); send({ t: 'grab' }); buzz(60); } });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => grab.addEventListener(ev, () => grab.classList.remove('press')));
+  // klavye (masaüstünden deneme)
+  const keys = {};
+  const kmove = () => setMove((keys.ArrowRight ? 1 : 0) - (keys.ArrowLeft ? 1 : 0), (keys.ArrowDown ? 1 : 0) - (keys.ArrowUp ? 1 : 0));
+  addEventListener('keydown', e => { if (document.activeElement === $('name')) return; if (e.key.startsWith('Arrow')) { keys[e.key] = true; kmove(); e.preventDefault(); } if (e.code === 'Space' && state === 'play') { send({ t: 'grab' }); e.preventDefault(); } });
+  addEventListener('keyup', e => { if (e.key.startsWith('Arrow')) { keys[e.key] = false; kmove(); } });
+
+  function confetti() {
+    const box = $('confetti'), cols = ['#86ff2e', '#ff26cf', '#1fb6ff', '#ffe02e', getComputedStyle(document.documentElement).getPropertyValue('--c')];
+    for (let i = 0; i < 70; i++) { const c = document.createElement('i'); c.style.left = Math.random() * 100 + 'vw'; c.style.background = cols[i % cols.length]; c.style.animationDuration = 1.6 + Math.random() * 1.8 + 's'; c.style.animationDelay = Math.random() * .5 + 's'; box.appendChild(c); setTimeout(() => c.remove(), 4200); }
+  }
+  connect();
+}
+</script>
+</body>
+</html>
