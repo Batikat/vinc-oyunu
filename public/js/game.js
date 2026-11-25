@@ -7,15 +7,16 @@
   const ease = t => t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 
   const DEFAULTS = { title: 'LUCKY CLAW', joinText: "QR'ı okut, 15 saniyede ödülünü kap!", playSeconds: 15, maxPlayers: 4, winRate: .35, playsPerPhone: 0, attractMode: true, qrSize: .15, prizes: [{ name: 'Sürpriz Hediye', weight: 1 }], grandPrize: 'BÜYÜK ÖDÜL' };
-  const S = { cfg: { ...DEFAULTS }, W: 5.4, H: 3, D: 1.35, balls: [], claws: [], queue: [], players: new Map(), parts: [], bursts: [], time: 0, ws: null, online: false, lastHuman: 0, debug: false, colorIdx: 0 };
+  const S = { cfg: { ...DEFAULTS }, W: 5.4, H: 3, D: 1.35, balls: [], claws: [], queue: [], players: new Map(), parts: [], bursts: [], waves: [], time: 0, ws: null, online: false, lastHuman: 0, debug: false, colorIdx: 0 };
   window.CLAW = S;
 
   // videodaki palet: neon lime, neon pembe, elektrik mavi, camgöbeği, sarı, şeftali, krem, beyaz
-  const BALL_PAL = [['#86ff2e', .9, .2, 3], ['#ff26cf', .7, .2, 3], ['#1d5cff', .18, .18, 2], ['#1fb6ff', .2, .18, 2], ['#ffe02e', .14, .2, 2],
-    ['#ffbc9c', .08, .26, 2], ['#f6efdc', .03, .3, 2], ['#ffffff', 0, .24, 1], ['#ff78d6', .25, .22, 1]];
+  // neon gece paleti: [renk, kendi ışığı, pürüzlülük, sıklık]
+  const BALL_PAL = [['#ff0f8f', .28, .14, 3], ['#00e5ff', .26, .14, 3], ['#7a2cff', .3, .14, 2], ['#8cff00', .3, .14, 2],
+    ['#ff5a00', .22, .16, 2], ['#ffe000', .18, .16, 1], ['#1a3dff', .3, .14, 2], ['#f4f0ff', .06, .12, 1]];
   const PAL_W = BALL_PAL.reduce((s, p) => s + p[3], 0);
-  const PLAYER_COLORS = ['#74ff1f', '#ff2fc4', '#2bc6ff', '#ffb01f', '#a070ff', '#ff5d4d'];
-  const C_WALL = lin('#8d92b0'), C_FLOOR = lin('#7a7f9c'), C_SILL = lin('#cdd1ee'), C_METAL = lin('#eceef6'), C_STRIPE = lin('#f3f5ff'), C_CLOUD = lin('#eef0ff'), C_STAR = lin('#f4f2ff'), C_LED = lin('#e8e6ff'), C_CABLE = lin('#c9ccd8');
+  const PLAYER_COLORS = ['#ff1f9e', '#14eaff', '#9cff1f', '#ffb31a', '#a05bff', '#ff4d4d'];
+  const C_WALL = lin('#1c1240'), C_FLOOR = lin('#140c2c'), C_SILL = lin('#241850'), C_BLACK = lin('#0a0912'), C_GOLD = lin('#ffd27a'), C_METAL = lin('#eceef6'), C_STRIPE = lin('#f3f5ff'), C_CLOUD = lin('#eef0ff'), C_STAR = lin('#f4f2ff'), C_LED = lin('#e8e6ff'), C_CABLE = lin('#c9ccd8');
 
   // ---------- yerleşim ----------
   const FOV = 32 * Math.PI / 180;
@@ -35,18 +36,18 @@
   function pickPal() { let r = Math.random() * PAL_W; for (const p of BALL_PAL) { r -= p[3]; if (r <= 0) return p; } return BALL_PAL[0]; }
   function makeBall(type, x, y, z) {
     const b = { x, y, z, px: x, py: y, pz: z, vx: 0, vy: 0, vz: 0, q: M.qAxis(rnd(-1, 1), rnd(-1, 1), rnd(-1, 1), rnd(0, 6.28)), type, held: null, scale: 1, id: Math.random() };
-    if (type === 'solid') { const p = pickPal(); b.r = rnd(.135, .178); b.col = lin(p[0]); b.emis = p[1]; b.rough = p[2]; }
-    else if (type === 'stripe') { b.r = rnd(.15, .18); b.col = C_STRIPE; }
-    else if (type === 'cloud') { b.r = rnd(.16, .19); b.col = C_CLOUD; }
-    else { b.r = .17; b.col = C_STAR; }
+    b.r = rnd(.135, .178);
+    if (type === 'solid' || type === 'stripe') { const p = pickPal(); b.col = lin(p[0]); b.emis = type === 'stripe' ? p[1] * .7 : p[1]; b.rough = p[2]; }
+    else if (type === 'black') { b.col = C_BLACK; b.emis = 0; b.rough = .06; }
+    else { b.col = C_GOLD; b.emis = .15; b.rough = .05; b.r = .165; } // büyük ödül: ayna altın top
     return b;
   }
-  function randomType(allowStar) { const r = Math.random(); return r < .72 ? 'solid' : r < .87 ? 'stripe' : r < .985 || !allowStar ? 'cloud' : 'star'; }
+  function randomType(allowGrand) { const r = Math.random(); return r < .7 ? 'solid' : r < .85 ? 'stripe' : r < .985 || !allowGrand ? 'black' : 'grand'; }
   function fillBalls() {
     S.balls = [];
     const vol = S.W * S.D * S.H * .34 * .6, n = clamp(Math.round(vol / (4 / 3 * Math.PI * .155 ** 3)), 120, 520);
     for (let i = 0; i < n; i++) {
-      const type = i < 3 ? 'star' : randomType(false);
+      const type = i < 3 ? 'grand' : randomType(false);
       S.balls.push(makeBall(type, rnd(-S.W / 2 + .2, S.W / 2 - .2), .2 + (i / n) * S.H * 1.1 + rnd(0, .2), rnd(-S.D / 2 + .2, S.D / 2 - .2)));
     }
     for (let i = 0; i < 300; i++) physics(1 / 60);
@@ -115,8 +116,9 @@
     const others = S.claws.map(c => c.x);
     let best = 0, bd = -1;
     for (let i = 0; i < 12; i++) { const x = rnd(-S.W / 2 + .5, S.W / 2 - .5), d = others.length ? Math.min(...others.map(o => Math.abs(o - x))) : 9; if (d > bd) { bd = d; best = x; } }
-    const hex = bot ? '#e9ecff' : PLAYER_COLORS[S.colorIdx++ % PLAYER_COLORS.length];
-    const c = { player, bot, hex, col: lin(hex), x: best, z: rnd(-.2, .2), y: S.H + 1.3, vx: 0, vz: 0, ix: 0, iz: 0, open: .5, state: 'enter', t: 0, left: S.cfg.playSeconds,
+    const hex = bot ? '#d9c8ff' : PLAYER_COLORS[S.colorIdx++ % PLAYER_COLORS.length];
+    const used = S.claws.map(c => c.lane); let lane = 0; while (used.includes(lane)) lane++;
+    const c = { player, bot, hex, col: lin(hex), lane, hy: S.hoverY - [0, .16, .32, .08, .24, .4][lane % 6], dodge: 0, x: best, z: rnd(-.2, .2), y: S.H + 1.3, vx: 0, vz: 0, ix: 0, iz: 0, open: .5, state: 'enter', t: 0, left: S.cfg.playSeconds,
       swx: 0, swz: 0, swvx: 0, swvz: 0, coll: [], grip: [0, 0, 0], gripLerp: 0, ball: null, outcome: null, tick: -1, hud: null };
     S.claws.push(c); makeHud(c);
     if (player) { player.claw = c; player.plays++; send(player.pid, { t: 'ready', color: hex }); }
@@ -125,7 +127,7 @@
   const K = 1.5; // pençe ölçeği
   function clawParts(c, draw) {
     const q = M.qMul(M.qAxis(1, 0, 0, c.swz), M.qAxis(0, 0, 1, -c.swx)), top = .66 * K;
-    const P = (ox, oy, oz) => { const r = M.qRot(q, ox * K, oy * K - top, oz * K); return [c.x + r[0], c.y + top + r[1], c.z + r[2]]; };
+    const P = (ox, oy, oz) => { const r = M.qRot(q, ox * K, oy * K - top, oz * K); return [c.x + r[0], c.y + top + r[1], c.zr + r[2]]; };
     const coll = [];
     const col = c.col, metal = C_METAL, glow = c.bot ? .12 : .8;
     if (draw) {
@@ -158,15 +160,15 @@
     c.coll = coll;
   }
   function surfaceUnder(c) {
-    let top = 0; for (const b of S.balls) { if (b.held) continue; const d = Math.hypot(b.x - c.x, b.z - c.z), R = b.r + .1; if (d < R) top = Math.max(top, b.y + Math.sqrt(R * R - d * d) - .1); }
+    let top = 0; for (const b of S.balls) { if (b.held) continue; const d = Math.hypot(b.x - c.x, b.z - c.zr), R = b.r + .1; if (d < R) top = Math.max(top, b.y + Math.sqrt(R * R - d * d) - .1); }
     return top;
   }
   function decide(c) {
     let best = null, bd = 1e9;
-    for (const b of S.balls) { if (b.held) continue; const d = Math.hypot(b.x - c.x, b.z - c.z); if (d < .34 && b.y + b.r > c.y - .65 && d < bd) { bd = d; best = b; } }
+    for (const b of S.balls) { if (b.held) continue; const d = Math.hypot(b.x - c.x, b.z - c.zr); if (d < .34 && b.y + b.r > c.y - .65 && d < bd) { bd = d; best = b; } }
     if (!best) return { outcome: 'miss' };
     let p = (S.cfg.winRate ?? .35) * (1 - (bd / .34) ** 2 * .55);
-    if (best.type === 'star') p *= .6; if (c.bot) p *= .7;
+    if (best.type === 'grand') p *= .6; if (c.bot) p *= .7;
     const r = Math.random();
     return { ball: best, outcome: r < p ? 'win' : r < p + .3 ? 'slip' : 'miss' };
   }
@@ -175,7 +177,7 @@
     const hw = S.W / 2 - .45, hd = S.D / 2 - .32;
     let tvx = 0, tvz = 0;
     if (c.state === 'enter') {
-      const k = clamp(c.t / 1.1, 0, 1); c.y = S.H + 1.3 + (S.hoverY - S.H - 1.3) * ease(k); c.open += (.5 - c.open) * dt * 4;
+      const k = clamp(c.t / 1.1, 0, 1); c.y = S.H + 1.3 + (c.hy - S.H - 1.3) * ease(k); c.open += (.5 - c.open) * dt * 4;
       if (k >= 1) { c.state = 'play'; c.t = 0; c.left = S.cfg.playSeconds; if (c.player) send(c.player.pid, { t: 'play', seconds: S.cfg.playSeconds, color: c.hex }); }
     } else if (c.state === 'play') {
       if (c.bot) botThink(c, dt);
@@ -193,9 +195,9 @@
       if (c.t > .7) { c.state = 'lift'; c.t = 0; c.liftFrom = c.y; }
     } else if (c.state === 'lift') {
       c.gripLerp = .6; c.y += dt * (c.ball ? .85 : 1.1);
-      const k = (c.y - c.liftFrom) / (S.hoverY - c.liftFrom);
+      const k = (c.y - c.liftFrom) / (c.hy - c.liftFrom);
       if (c.ball && c.outcome === 'slip' && k > .42) { release(c, true); }
-      if (c.y >= S.hoverY) { c.y = S.hoverY; c.state = 'result'; c.t = 0; finish(c); }
+      if (c.y >= c.hy) { c.y = c.hy; c.state = 'result'; c.t = 0; finish(c); }
     } else if (c.state === 'result') {
       if (c.outcome === 'win' && c.ball && c.t > .45) { pop(c.ball, c.col); S.balls.splice(S.balls.indexOf(c.ball), 1); c.ball = null; setTimeout(() => S.balls.push(makeBall(randomType(true), rnd(-S.W / 2 + .3, S.W / 2 - .3), S.H + .3, rnd(-.3, .3))), 1600); }
       if (c.t > (c.outcome === 'win' ? 2.4 : 1.2)) { c.state = 'exit'; c.t = 0; }
@@ -205,21 +207,22 @@
     }
     c.vx += (tvx - c.vx) * Math.min(1, dt * 7); c.vz += (tvz - c.vz) * Math.min(1, dt * 7);
     c.x = clamp(c.x + c.vx * dt, -hw, hw); c.z = clamp(c.z + c.vz * dt, -hd, hd);
+    if (c.zr === undefined || c.state === 'play' || c.state === 'enter' || c.state === 'exit') c.zr = clamp(c.z + c.dodge, -hd, hd);
     // yay benzeri sallanma
     const ax = (c.vx * .16 - c.swx) * 55 - c.swvx * 5, az = (c.vz * .16 - c.swz) * 55 - c.swvz * 5;
     c.swvx += ax * dt; c.swvz += az * dt; c.swx += c.swvx * dt; c.swz += c.swvz * dt;
     // tutulan topun hedefi
-    c.grip = [c.x, c.y - .25 - (c.ball ? c.ball.r : .15) * .9, c.z];
+    c.grip = [c.x, c.y - .25 - (c.ball ? c.ball.r : .15) * .9, c.zr];
   }
   function drop(c) { if (c.state !== 'play') return; c.state = 'drop'; c.t = 0; c.ix = c.iz = 0; if (c.player) send(c.player.pid, { t: 'drop' }); }
   function release(c, slip) { if (!c.ball) return; c.ball.held = null; c.ball.vy = -.5; c.ball = null; if (slip) c.open = .55; }
   function finish(c) {
     const win = c.outcome === 'win' && c.ball;
     let prize = '';
-    if (win) prize = c.ball.type === 'star' ? S.cfg.grandPrize : pickPrize();
+    if (win) prize = c.ball.type === 'grand' ? S.cfg.grandPrize : pickPrize();
     const code = String(Math.floor(1000 + Math.random() * 9000));
     if (win) showPop(c, 'KAZANDI!', prize); else showPop(c, c.outcome === 'slip' ? 'Kıl payı!' : 'Bir dahaki sefere', '');
-    if (c.player) send(c.player.pid, { t: 'result', win: !!win, prize, code, grand: win && c.ball.type === 'star', near: c.outcome === 'slip' });
+    if (c.player) send(c.player.pid, { t: 'result', win: !!win, prize, code, grand: win && c.ball.type === 'grand', near: c.outcome === 'slip' });
     if (win && c.player) console.log('KAZANAN', c.player.name || c.player.pid, prize, code);
   }
   function pickPrize() { const list = S.cfg.prizes || []; let t = list.reduce((s, p) => s + (+p.weight || 1), 0), r = Math.random() * t; for (const p of list) { r -= (+p.weight || 1); if (r <= 0) return p.name; } return list[0]?.name || 'Hediye'; }
@@ -238,48 +241,75 @@
   }
 
   // ---------- parçacıklar ----------
-  const CONF = ['#b6ff22', '#ff26cf', '#1fb6ff', '#ffe02e', '#ffffff', '#ff8a5c'].map(lin);
+  const CONF = ['#ff1f9e', '#14eaff', '#9cff1f', '#ffe41a', '#ffffff', '#9b4dff'].map(lin);
   function pop(b, col) {
     for (let i = 0; i < 90; i++) {
       const th = rnd(0, 6.28), ph = Math.acos(rnd(-1, 1)), sp = rnd(1.5, 4.2);
       S.parts.push({ x: b.x, y: b.y, z: b.z, vx: Math.sin(ph) * Math.cos(th) * sp, vy: Math.cos(ph) * sp + 1.5, vz: Math.sin(ph) * Math.sin(th) * sp * .4, life: rnd(1.4, 2.6), age: 0, col: i % 4 ? CONF[i % CONF.length] : col, q: M.qAxis(rnd(-1, 1), 1, rnd(-1, 1), rnd(0, 6)), spin: rnd(4, 12), s: rnd(.025, .045), box: Math.random() < .6 });
     }
-    S.bursts.push({ x: b.x, y: b.y, z: b.z, age: 0, col });
+    S.bursts.push({ x: b.x, y: b.y, z: b.z, age: 0, col }); S.waves.push({ x: b.x, y: b.y, z: b.z, age: 0, col });
   }
   function updateParts(dt) {
     for (const p of S.parts) { p.age += dt; p.vy -= 4.5 * dt; p.vx *= .985; p.vz *= .985; p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; if (p.y < .05) { p.y = .05; p.vy *= -.3; p.vx *= .7; } p.q = M.qMul(M.qAxis(1, .3, .2, p.spin * dt), p.q); }
     S.parts = S.parts.filter(p => p.age < p.life);
-    S.bursts.forEach(b => b.age += dt); S.bursts = S.bursts.filter(b => b.age < .7);
+    S.bursts.forEach(b => b.age += dt); S.bursts = S.bursts.filter(b => b.age < .7); S.waves.forEach(w => w.age += dt); S.waves = S.waves.filter(w => w.age < 1.1);
   }
 
   // ---------- sahneyi çiz ----------
   const DIRS = (() => { const a = [], n = 22; for (let i = 0; i < n; i++) { const y = 1 - 2 * (i + .5) / n, r = Math.sqrt(1 - y * y), t = i * 2.39996; a.push([r * Math.cos(t), y, r * Math.sin(t)]); } return a; })();
   const CLOUD = [[0, 0, 0, .62], [.48, 0, 0, .48], [-.48, 0, 0, .48], [0, .48, 0, .48], [0, -.48, 0, .48], [0, 0, .48, .48], [0, 0, -.48, .48], [.33, .33, .33, .4], [-.33, .33, -.33, .4]];
+  function hsv(h, sat, v) { h = ((h % 1) + 1) % 1; const f = k => { const x = (k + h * 6) % 6; return v - v * sat * Math.max(0, Math.min(x, 4 - x, 1)); }; return [f(5), f(3), f(1)].map(c => Math.pow(c, 2.2)); }
+  const NEON_P = lin('#ff1f9e'), NEON_C = lin('#14eaff'), NEON_V = lin('#9b4dff');
+  function tube(ax, ay, az, bx, by, bz, col, e) { G.seg(ax, ay, az, bx, by, bz, .018, col, 7, .3, 0, e, 1); }
+  function ring(cx, cy, cz, r, col, e, n = 64, a0 = 0, a1 = Math.PI * 2) {
+    for (let i = 0; i < n; i++) { const t0 = a0 + (a1 - a0) * i / n, t1 = a0 + (a1 - a0) * (i + 1) / n; tube(cx + Math.cos(t0) * r, cy + Math.sin(t0) * r, cz, cx + Math.cos(t1) * r, cy + Math.sin(t1) * r, cz, col, e); }
+  }
   function drawScene() {
-    const W = S.W, H = S.H, D = S.D, hd = D / 2;
-    G.add('box', 0, H / 2, -hd - .1, null, W + 1, H + 1, .2, C_WALL, 4, .85, 0, 0, 1);
-    G.add('box', 0, -.1, 0, null, W + 1, .2, D + .6, C_FLOOR, 2, .8, 0, 0, 1);
-    G.add('box', -W / 2 - .1, H / 2, 0, null, .2, H + 1, D + .4, C_WALL, 2, .85, 0, 0, 1);
-    G.add('box', W / 2 + .1, H / 2, 0, null, .2, H + 1, D + .4, C_WALL, 2, .85, 0, 0, 1);
-    G.add('box', 0, H + .1, 0, null, W + 1, .2, D + .4, C_WALL, 2, .85, 0, 0, 1);
-    G.add('box', 0, -.16, hd + .14, null, W + 1, .4, .3, C_SILL, 2, .55, 0, .05, 1);           // ön alt pervaz
-    G.add('box', 0, H + .2, hd + .08, null, W + 1, .44, .22, C_WALL, 2, .8, 0, 0, 1);           // üst kemer
-    G.add('box', 0, H - .035, hd - .05, null, W, .025, .03, C_LED, 7, .5, 0, 5, 1);              // üst LED şerit
-    G.add('box', 0, H - .02, -hd + .03, null, W, .02, .03, C_LED, 7, .5, 0, 2.5, 1);
-    for (const s of [-1, 1]) G.add('box', s * (W / 2 - .02), H / 2, hd - .05, null, .02, H, .03, C_LED, 7, .5, 0, 1.1, 1);
+    const W = S.W, H = S.H, D = S.D, hd = D / 2, t = S.time;
+    G.add('box', 0, H / 2, -hd - .1, null, W + 1, H + 1, .2, C_WALL, 2, .35, 0, 0, 1);
+    G.add('box', 0, -.1, 0, null, W + 1, .2, D + .6, C_FLOOR, 2, .3, 0, 0, 1);
+    G.add('box', -W / 2 - .1, H / 2, 0, null, .2, H + 1, D + .4, C_WALL, 2, .35, 0, 0, 1);
+    G.add('box', W / 2 + .1, H / 2, 0, null, .2, H + 1, D + .4, C_WALL, 2, .35, 0, 0, 1);
+    G.add('box', 0, H + .1, 0, null, W + 1, .2, D + .4, C_WALL, 2, .35, 0, 0, 1);
+    G.add('box', 0, -.16, hd + .14, null, W + 1, .4, .3, C_SILL, 2, .25, 0, 0, 1);            // ön alt pervaz
+    G.add('box', 0, H + .2, hd + .08, null, W + 1, .44, .22, C_SILL, 2, .25, 0, 0, 1);         // üst kemer
+    // kenar neon tüpleri
+    const pulse = .85 + .15 * Math.sin(t * 2.2);
+    tube(-W / 2, H - .04, hd - .06, W / 2, H - .04, hd - .06, NEON_P, 5 * pulse);
+    tube(-W / 2, H - .03, -hd + .04, W / 2, H - .03, -hd + .04, NEON_C, 3.5);
+    tube(-W / 2 + .03, .02, hd - .06, -W / 2 + .03, H - .04, hd - .06, NEON_P, 4);
+    tube(W / 2 - .03, .02, hd - .06, W / 2 - .03, H - .04, hd - .06, NEON_C, 4);
+    tube(-W / 2, .045, hd + .02, W / 2, .045, hd + .02, NEON_V, 4.5);
+    // arka duvar neon sanatı: iç içe halkalar, yavaşça dönen yaylar
+    const cy = H * .63, cz = -hd + .035, R = Math.min(W * .2, H * .3);
+    ring(0, cy, cz, R, NEON_P, 3.2 * pulse, 72);
+    ring(0, cy, cz, R * .72, NEON_C, 3.2, 56);
+    ring(0, cy, cz, R * 1.28, NEON_V, 3, 40, t * .5, t * .5 + 2.2);
+    ring(0, cy, cz, R * 1.28, NEON_V, 3, 40, t * .5 + Math.PI, t * .5 + Math.PI + 2.2);
+    for (const sgn of [-1, 1]) { // yanlarda yatay ışık çizgileri (ekolayzer)
+      for (let i = 0; i < 5; i++) {
+        const y = cy - R * .6 + i * R * .3, len = (.35 + .25 * Math.sin(t * 3 + i * 1.3 + sgn)) * W * .14, x0 = sgn * (R * 1.55);
+        tube(x0, y, cz, x0 + sgn * len, y, cz, i % 2 ? NEON_C : NEON_P, 2.6);
+      }
+    }
+    // çerçevede yürüyen ampuller
+    const nb = Math.round(W / .2);
+    for (let i = 0; i <= nb; i++) {
+      const x = -W / 2 + W * i / nb, k = .5 + .5 * Math.sin(t * 6 - i * .7);
+      G.add('sphere', x, H + .12, hd + .2, null, .03, .03, .03, hsv(i / nb + t * .1, .8, 1), 7, .2, 0, 1 + 5 * k, 1);
+      G.add('sphere', x, -.06, hd + .3, null, .028, .028, .028, hsv(.5 + i / nb - t * .1, .8, 1), 7, .2, 0, 1 + 5 * (1 - k), 1);
+    }
     // toplar
     for (const b of S.balls) {
       const ao = .62 + .38 * clamp(b.y / (H * .42), 0, 1), r = b.r * b.scale;
       if (b.type === 'solid') G.add('sphere', b.x, b.y, b.z, b.q, r, r, r, b.col, 0, b.rough, 0, b.emis, ao);
-      else if (b.type === 'stripe') G.add('sphere', b.x, b.y, b.z, b.q, r, r, r, b.col, 1, .28, 0, .02, ao);
-      else if (b.type === 'cloud') for (const k of CLOUD) { const o = M.qRot(b.q, k[0] * r, k[1] * r, k[2] * r); G.add('sphere', b.x + o[0], b.y + o[1], b.z + o[2], null, k[3] * r, k[3] * r, k[3] * r, b.col, 6, .5, 0, .03, ao); }
-      else {
-        G.add('sphere', b.x, b.y, b.z, b.q, r * .5, r * .5, r * .5, b.col, 0, .15, .2, .25, ao);
-        for (const d of DIRS) { const v = M.qRot(b.q, ...d); G.add('cone', b.x + v[0] * r * .3, b.y + v[1] * r * .3, b.z + v[2] * r * .3, M.qFromTo(...v), r * .15, r * .95, r * .15, b.col, 0, .15, .2, .3, ao); }
-      }
+      else if (b.type === 'stripe') G.add('sphere', b.x, b.y, b.z, b.q, r, r, r, b.col, 1, .2, 0, b.emis, ao);
+      else if (b.type === 'black') G.add('sphere', b.x, b.y, b.z, b.q, r, r, r, b.col, 0, b.rough, 0, 0, ao);
+      else G.add('sphere', b.x, b.y, b.z, b.q, r, r, r, b.col, 0, b.rough, 1, b.emis + .25 * (1 + Math.sin(t * 4)), ao);
     }
     for (const c of S.claws) clawParts(c, true);
     for (const p of S.parts) { const f = 1 - Math.max(0, p.age - p.life + .4) / .4; if (p.box) G.add('box', p.x, p.y, p.z, p.q, p.s * 1.6 * f, p.s * .25, p.s * f, p.col, 0, .35, 0, .5, 1); else G.add('sphere', p.x, p.y, p.z, null, p.s * .7 * f, p.s * .7 * f, p.s * .7 * f, p.col, 0, .2, 0, .9, 1); }
+    for (const w of S.waves) { const k = w.age / 1.1, e = 8 * (1 - k) ** 2; ring(w.x, w.y, w.z + .2, .15 + k * 1.6, w.col, e, 48); ring(w.x, w.y, w.z + .2, .1 + k * 1.1, [1, 1, 1], e * .6, 40); }
     for (const b of S.bursts) { const k = b.age / .7, len = .25 + k * .9, w = .05 * (1 - k); for (const d of DIRS) G.add('cone', b.x + d[0] * k * .3, b.y + d[1] * k * .3, b.z + d[2] * k * .3, M.qFromTo(...d), w, len, w, b.col, 7, .3, 0, 6 * (1 - k), 1); }
   }
 
@@ -288,8 +318,7 @@
   function makeHud(c) {
     const el = document.createElement('div'); el.className = 'hud';
     el.style.setProperty('--c', c.hex);
-    el.innerHTML = `<svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="18" class="bg"/><circle cx="22" cy="22" r="18" class="fg" pathLength="100"/></svg><b></b><span class="nm"></span>`;
-    el.querySelector('.nm').textContent = c.player?.name || '';
+    el.innerHTML = `<svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="18" class="bg"/><circle cx="22" cy="22" r="18" class="fg" pathLength="100"/></svg>`;
     hudLayer.appendChild(el); c.hud = el;
   }
   function updateHud() {
@@ -297,20 +326,12 @@
       const el = c.hud; if (!el) continue;
       const show = (c.state === 'play' || c.state === 'enter') && !c.bot;
       el.style.opacity = show ? 1 : 0;
-      const p = G.project(c.x + .34, c.y + .72, c.z);
+      const p = G.project(c.x + .34, c.y + .72, c.zr);
       el.style.transform = `translate(${p[0] * innerWidth}px,${p[1] * innerHeight}px) translate(-50%,-50%)`;
-      el.querySelector('b').textContent = Math.ceil(c.left);
       el.querySelector('.fg').style.strokeDashoffset = 100 - (c.left / S.cfg.playSeconds) * 100;
     }
   }
-  function showPop(c, title, sub) {
-    const el = document.createElement('div'); el.className = 'pop' + (c.outcome === 'win' ? ' win' : '');
-    el.style.setProperty('--c', c.hex);
-    el.innerHTML = '<strong></strong><em></em>'; el.querySelector('strong').textContent = title; el.querySelector('em').textContent = sub;
-    const p = G.project(c.x, c.y + .1, c.z);
-    el.style.left = p[0] * 100 + '%'; el.style.top = p[1] * 100 + '%';
-    hudLayer.appendChild(el); setTimeout(() => el.remove(), 2600);
-  }
+  function showPop() { } // ekranda yazı yok: kazanma anı 3D ışık dalgası + konfeti ile gösterilir
 
   // ---------- oyuncular / sıra ----------
   function player(pid) { let p = S.players.get(pid); if (!p) S.players.set(pid, p = { pid, name: '', plays: 0, claw: null, online: true }); return p; }
@@ -356,13 +377,9 @@
   function applyConfig() {
     const url = S.playUrl || (location.origin + '/play');
     document.getElementById('qrimg').innerHTML = QR.toSVG(url, { quiet: 2 });
-    document.getElementById('jointext').textContent = S.cfg.joinText;
-    document.getElementById('brand').textContent = S.cfg.title;
-    document.getElementById('qrurl').textContent = url.replace(/^https?:\/\//, '');
     document.documentElement.style.setProperty('--qr', (S.cfg.qrSize || .15) * 100 + 'vmin');
-    drawTitle();
   }
-  function updateQueueChip() { const el = document.getElementById('queue'); el.textContent = S.queue.length ? `Sırada ${S.queue.length} kişi` : ''; el.style.opacity = S.queue.length ? 1 : 0; }
+  function updateQueueChip() { const el = document.getElementById('queue'); el.innerHTML = '<i></i>'.repeat(Math.min(S.queue.length, 12)); }
   function drawTitle() {
     const cv = document.createElement('canvas'); cv.width = 2048; cv.height = Math.round(2048 * S.titleRect[3] / S.titleRect[2]);
     const x = cv.getContext('2d'); x.fillStyle = '#fff'; x.textAlign = 'center'; x.textBaseline = 'middle';
@@ -378,7 +395,7 @@
     keys[e.code] = true;
     if (e.code === 'KeyF') document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.();
     if (e.code === 'KeyQ') document.body.classList.toggle('noqr');
-    if (e.code === 'KeyD') S.debug = !S.debug;
+    if (e.code === 'KeyD') { S.debug = !S.debug; document.body.classList.toggle('debug', S.debug); }
     if (e.code === 'KeyT') onMsg({ t: 'join', pid: 'kb', name: 'Test' });
     if (e.code === 'Space') { const p = S.players.get('kb'); if (p?.claw) drop(p.claw); e.preventDefault(); }
   });
@@ -391,25 +408,30 @@
   function resize() {
     const scale = Math.min(devicePixelRatio || 1, 1.5), w = Math.min(2560, Math.round(innerWidth * scale)), h = Math.round(w * innerHeight / innerWidth);
     canvas.width = w; canvas.height = h; G.resize(w, h);
-    const oldW = S.W; layout(); if (S.balls.length && Math.abs(oldW - S.W) > .3) fillBalls(); drawTitle();
+    const oldW = S.W; layout(); if (S.balls.length && Math.abs(oldW - S.W) > .3) fillBalls();
   }
   function frame(now) {
     const dt = Math.min(1 / 30, (now - last) / 1000); last = now; S.time += dt;
     fpsAcc += dt; fpsN++; if (fpsAcc > .5) { fpsEl.textContent = S.debug ? `${Math.round(fpsN / fpsAcc)} fps · ${S.balls.length} top · ${S.claws.length} pençe` : ''; fpsAcc = 0; fpsN = 0; }
     keyboard();
     S.claws.slice().forEach(c => updateClaw(c, dt));
-    // pençeler birbirinin içine girmesin
-    for (const a of S.claws) for (const b of S.claws) if (a !== b && a.state === 'play' && b.y < S.H) { const dx = a.x - b.x, dz = a.z - b.z, d = Math.hypot(dx, dz) || .01; if (d < .8) { a.x += dx / d * (.8 - d) * .5; a.z += dz / d * (.8 - d) * .5; } }
+    // pençeler birbirini itmez: yaklaşınca biri öne biri arkaya süzülür, temas etmeden yan yana geçerler
+    for (const a of S.claws) {
+      if (!['play', 'enter', 'exit'].includes(a.state)) continue;
+      let tgt = 0;
+      for (const b of S.claws) if (a !== b && a.y < S.H + .5 && b.y < S.H + .5 && Math.abs(a.x - b.x) < .75) tgt += a.lane < b.lane ? .34 : -.34;
+      tgt = clamp(tgt, -.34, .34); a.dodge += (tgt - a.dodge) * Math.min(1, dt * 4);
+    }
     if (S.cfg.attractMode && !S.queue.length && !S.claws.length && S.time - S.lastHuman > 6) { newClaw(null, true); S.lastHuman = S.time; }
     physics(dt); updateParts(dt);
     G.begin(); drawScene();
     const L = [.22, 1, .5], l = Math.hypot(...L);
-    G.render(S.cam, { lightDir: L.map(v => v / l), box: [S.W / 2, S.H, S.D / 2], titleRect: S.titleRect, time: S.time, bloom: .55, exposure: .95, bloomThreshold: 1.25 });
+    G.render(S.cam, { lightDir: L.map(v => v / l), box: [S.W / 2, S.H, S.D / 2], titleRect: S.titleRect, time: S.time, bloom: .6, exposure: .95, bloomThreshold: 1.35 });
     updateHud();
     requestAnimationFrame(frame);
   }
   try { G.init(canvas); } catch (e) { document.body.innerHTML = '<p style="color:#fff;font:24px sans-serif;padding:40px">Bu tarayıcı WebGL2 desteklemiyor. Chrome veya Edge kullanın.</p>'; throw e; }
-  layout(); resize(); applyConfig(); fillBalls(); updateQueueChip();
+  layout(); resize(); applyConfig(); drawTitle(); fillBalls(); updateQueueChip();
   addEventListener('resize', resize);
   fetch('/info').then(r => r.json()).then(i => { if (!S.online) { Object.assign(S.cfg, i.config || {}); S.playUrl = i.playUrl; applyConfig(); } }).catch(() => { });
   connect();
