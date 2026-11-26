@@ -8,42 +8,42 @@
 <style>
   :root { --qr: 15vmin; }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; background: #04030a; overflow: hidden; cursor: none; font-family: "Arial Black", "Helvetica Neue", Arial, sans-serif; }
+  html, body { margin: 0; height: 100%; background: #05050a; overflow: hidden; cursor: none; font-family: "Arial Black", "Helvetica Neue", Arial, sans-serif; }
   canvas#c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   #hud { position: fixed; inset: 0; pointer-events: none; }
 
-  /* sadece QR — neon çerçeveli kart, yazı yok */
-  #join { position: fixed; left: 50%; bottom: 6vh; transform: translateX(-50%); transition: opacity .5s; }
+  /* QR kartı — videodaki gibi topların önünde, ortada */
+  #join { position: fixed; left: 50%; bottom: 5.5vh; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 1.1vmin; transition: opacity .5s; text-align: center; }
   body.noqr #join { opacity: 0; }
-  #qrframe { position: relative; padding: .7vmin; border-radius: 2.2vmin; background: conic-gradient(from var(--a, 0deg), #ff1f9e, #9b4dff, #14eaff, #9cff1f, #ff1f9e); animation: spinA 4s linear infinite; box-shadow: 0 0 3vmin rgba(255, 31, 158, .55), 0 0 6vmin rgba(20, 234, 255, .35); }
-  @property --a { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
-  @keyframes spinA { to { --a: 360deg; } }
-  #qrimg { width: var(--qr); height: var(--qr); background: #fff; border-radius: 1.6vmin; padding: .5vmin; }
+  #qrimg { width: var(--qr); height: var(--qr); background: #fff; border-radius: 1.2vmin; padding: .4vmin; box-shadow: 0 1.5vmin 4vmin rgba(20, 10, 60, .45), 0 0 0 .35vmin rgba(255, 255, 255, .6); }
   #qrimg svg { width: 100%; height: 100%; display: block; }
-  #queue { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); margin-top: 1.6vmin; display: flex; gap: .9vmin; }
-  #queue i { width: 1.3vmin; height: 1.3vmin; border-radius: 50%; background: #fff; box-shadow: 0 0 1.2vmin #14eaff, 0 0 2.4vmin #ff1f9e; animation: blink 1.4s ease-in-out infinite; }
+  #brand { color: #fff; font-size: clamp(22px, 4.6vmin, 90px); letter-spacing: -.02em; line-height: .9; text-shadow: 0 .4vmin 2vmin rgba(40, 10, 90, .7); }
+  #queue { display: flex; gap: .9vmin; min-height: 1.3vmin; }
+  #queue i { width: 1.3vmin; height: 1.3vmin; border-radius: 50%; background: #fff; box-shadow: 0 0 1.2vmin rgba(160, 120, 255, .9); animation: blink 1.4s ease-in-out infinite; }
   #queue i:nth-child(2n) { animation-delay: .35s; }
   @keyframes blink { 50% { opacity: .35; } }
 
-  /* pençe yanındaki rakamsız sayaç halkası */
-  .hud { position: absolute; left: 0; top: 0; width: 5.6vmin; height: 5.6vmin; transition: opacity .3s; }
-  .hud svg { position: absolute; inset: 0; transform: rotate(-90deg); filter: drop-shadow(0 0 .7vmin var(--c)) drop-shadow(0 0 1.6vmin var(--c)); }
-  .hud circle { fill: none; stroke-width: 4.5; }
-  .hud .bg { stroke: rgba(255, 255, 255, .12); }
+  /* pençe yanındaki geri sayım halkası */
+  .hud { position: absolute; left: 0; top: 0; width: 6.4vmin; height: 6.4vmin; transition: opacity .3s; }
+  .hud svg { position: absolute; inset: 0; transform: rotate(-90deg); filter: drop-shadow(0 0 .8vmin var(--c)); }
+  .hud circle { fill: none; stroke-width: 3.6; }
+  .hud .bg { stroke: rgba(255, 255, 255, .25); }
   .hud .fg { stroke: var(--c); stroke-dasharray: 100; stroke-linecap: round; transition: stroke-dashoffset .25s linear; }
+
 
   #dbg { position: fixed; left: 10px; bottom: 8px; color: #fff; font: 12px monospace; opacity: .7; }
   body:not(.debug) #offline, body:not(.debug) #dbg { display: none; }
   #offline { position: fixed; left: 50%; top: 2vmin; transform: translateX(-50%); color: #fff; background: rgba(200, 30, 60, .85); padding: .8vmin 1.6vmin; border-radius: 99px; font: 700 clamp(12px, 1.6vmin, 24px) Arial, sans-serif; }
   body.online #offline { display: none; }
-  @media (prefers-reduced-motion: reduce) { #qrframe, #queue i { animation: none; } }
+  @media (prefers-reduced-motion: reduce) { #queue i { animation: none; } }
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
 <div id="hud"></div>
 <div id="join">
-  <div id="qrframe"><div id="qrimg"></div></div>
+  <div id="qrimg"></div>
+  <div id="brand"></div>
   <div id="queue"></div>
 </div>
 <div id="offline">Sunucu bağlantısı yok — telefonlar bağlanamaz (T: klavye ile test)</div>

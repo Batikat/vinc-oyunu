@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Vinç Oyunu — Ödül Paneli</title>
+<style>
+  :root { --bg: #f2f1f8; --card: #fff; --ink: #1d1a33; --soft: #6f6a8c; --line: #e3e1ee; --acc: #4a3aff; --bad: #e0244f; --ok: #12a36b; --lose: #d6d3e4; }
+  * { box-sizing: border-box; min-width: 0; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+  header { background: #16132b; color: #fff; padding: 18px max(4vw, 16px); display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  header h1 { margin: 0; font-size: 20px; flex: 1; }
+  .chip { font-size: 13px; padding: 4px 10px; border-radius: 99px; background: rgba(255, 255, 255, .12); white-space: nowrap; }
+  .chip.on::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #3ef0a0; margin-right: 6px; }
+  .chip.off::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ff5b7f; margin-right: 6px; }
+  header a { color: #cfc9ff; font-size: 14px; }
+  main { max-width: 980px; margin: 0 auto; padding: 24px max(4vw, 16px) 120px; display: grid; gap: 20px; }
+  .card { background: var(--card); border-radius: 18px; padding: 22px; box-shadow: 0 1px 0 var(--line), 0 8px 24px rgba(30, 20, 80, .05); }
+  h2 { margin: 0 0 14px; font-size: 18px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
+  label { display: grid; gap: 6px; font-size: 14px; color: var(--soft); font-weight: 600; }
+  input[type=text], input[type=number], input[type=password], input[type=search] { font: 16px inherit; font-family: inherit; padding: 11px 13px; border: 1.5px solid var(--line); border-radius: 12px; background: #fff; color: var(--ink); width: 100%; }
+  input:focus { outline: none; border-color: var(--acc); box-shadow: 0 0 0 3px rgba(74, 58, 255, .15); }
+  .toggle { display: flex; align-items: center; gap: 10px; color: var(--ink); font-weight: 600; min-height: 44px; }
+  .toggle input { width: 22px; height: 22px; accent-color: var(--acc); }
+  button { font: 600 15px inherit; font-family: inherit; border: 0; border-radius: 12px; padding: 11px 18px; cursor: pointer; min-height: 44px; }
+  button:focus-visible { outline: 3px solid var(--acc); outline-offset: 2px; }
+  .primary { background: var(--acc); color: #fff; }
+  .ghost { background: #eceaf7; color: var(--ink); }
+  .danger { background: #fde8ee; color: var(--bad); }
+  .prize { display: grid; grid-template-columns: 18px minmax(0, 1fr) 120px 44px; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .prize .sw { width: 14px; height: 14px; border-radius: 4px; }
+  .pct { position: relative; }
+  .pct input { padding-right: 30px; text-align: right; }
+  .pct span { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--soft); font-weight: 700; }
+  .del { background: none; color: var(--soft); font-size: 22px; padding: 0; }
+  .del:hover { color: var(--bad); }
+  .bar { display: flex; height: 22px; border-radius: 99px; overflow: hidden; background: var(--lose); margin: 18px 0 10px; }
+  .bar i { display: block; height: 100%; transition: width .2s; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 14px; color: var(--soft); }
+  .legend b { color: var(--ink); }
+  .sum { font-size: 15px; margin-top: 8px; }
+  .sum.bad { color: var(--bad); font-weight: 700; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 14px; }
+  table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  th { text-align: left; color: var(--soft); font-size: 13px; font-weight: 600; padding: 8px 6px; border-bottom: 1.5px solid var(--line); }
+  td { padding: 9px 6px; border-bottom: 1px solid var(--line); }
+  td.code { font: 700 16px ui-monospace, Consolas, monospace; letter-spacing: .08em; }
+  td.t { color: var(--soft); white-space: nowrap; font-size: 13px; }
+  .empty { color: var(--soft); padding: 18px 0; text-align: center; }
+  .scroll { max-height: 420px; overflow: auto; }
+  .savebar { position: fixed; left: 0; right: 0; bottom: 0; background: rgba(255, 255, 255, .94); backdrop-filter: blur(8px); border-top: 1px solid var(--line); padding: 12px max(4vw, 16px); display: flex; justify-content: center; gap: 14px; align-items: center; }
+  .savebar .msg { font-size: 14px; color: var(--soft); }
+  .savebar .msg.ok { color: var(--ok); font-weight: 700; } .savebar .msg.bad { color: var(--bad); font-weight: 700; }
+  #login { min-height: 100vh; display: grid; place-items: center; padding: 20px; }
+  #login .card { width: min(380px, 100%); display: grid; gap: 14px; }
+  #login .err { color: var(--bad); font-size: 14px; min-height: 1.4em; }
+  .hide { display: none !important; }
+  @media (max-width: 600px) { .prize { grid-template-columns: 14px minmax(0, 1fr) 96px 40px; } td.t { display: none; } }
+</style>
+</head>
+<body>
+<section id="login">
+  <form class="card" id="loginForm">
+    <h2>Ödül paneli</h2>
+    <label>Şifre<input type="password" id="pw" autocomplete="current-password" autofocus></label>
+    <div class="err" id="loginErr"></div>
+    <button class="primary" type="submit">Giriş yap</button>
+  </form>
+</section>
+
+<div id="app" class="hide">
+  <header>
+    <h1 id="htitle">Ödül paneli</h1>
+    <span class="chip" id="scr">Ekran</span>
+    <span class="chip" id="ply">0 telefon bağlı</span>
+    <a href="/" target="_blank" rel="noopener">Ekranı aç ↗</a>
+  </header>
+  <main>
+    <section class="card">
+      <h2>Ödüller ve kazanma ihtimalleri</h2>
+      <div id="prizes"></div>
+      <div class="row"><button class="ghost" id="addPrize" type="button">+ Ödül ekle</button></div>
+      <div class="bar" id="bar"></div>
+      <div class="legend" id="legend"></div>
+      <div class="sum" id="sum"></div>
+    </section>
+
+    <section class="card">
+      <h2>Oyun ayarları</h2>
+      <div class="grid">
+        <label>Oyun adı (ekranda görünür)<input type="text" id="title" maxlength="30"></label>
+        <label>Oyun süresi (saniye)<input type="number" id="playSeconds" min="5" max="60"></label>
+        <label>Aynı anda oyuncu<input type="number" id="maxPlayers" min="1" max="6"></label>
+        <label>Telefon başına hak (0 = sınırsız)<input type="number" id="playsPerPhone" min="0" max="99"></label>
+      </div>
+      <div class="toggle" style="margin-top:12px"><input type="checkbox" id="attractMode"><label for="attractMode" style="color:inherit">Kimse oynamıyorken vitrin pençesi kendi kendine oynasın</label></div>
+    </section>
+
+    <section class="card">
+      <h2>Kazananlar</h2>
+      <div class="row" style="margin-top:0">
+        <input type="search" id="find" placeholder="Kod veya isim ara" style="max-width:260px">
+        <button class="ghost" id="dl" type="button">Listeyi indir (Excel)</button>
+        <button class="danger" id="clear" type="button">Listeyi temizle</button>
+      </div>
+      <div class="scroll" style="margin-top:12px">
+        <table><thead><tr><th>Kod</th><th>Ödül</th><th>İsim</th><th>Zaman</th></tr></thead><tbody id="wins"></tbody></table>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Panel şifresi</h2>
+      <label style="max-width:320px">Yeni şifre (değiştirmeyeceksen boş bırak)<input type="password" id="newPassword" autocomplete="new-password"></label>
+    </section>
+  </main>
+  <div class="savebar"><span class="msg" id="msg">Değişiklikler kaydedilince ekrana anında uygulanır.</span><button class="primary" id="save" type="button">Kaydet</button></div>
+</div>
+
+<script>
+{
+  const $ = id => document.getElementById(id);
+  const COLORS = ['#4a3aff', '#ff2f8e', '#12b5d6', '#ffb01f', '#16b36e', '#a05bff', '#ff6a3d', '#2b6bff', '#d4b400', '#e0244f'];
+  let token = ''; try { token = sessionStorage.getItem('claw_admin') || ''; } catch (e) { }
+  let prizes = [], wins = [], dirty = false;
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  async function call(url, body) {
+    const r = await fetch(url, { method: body ? 'POST' : 'GET', headers: { 'Content-Type': 'application/json', 'x-token': token }, body: body ? JSON.stringify(body) : undefined });
+    const j = await r.json().catch(() => ({}));
+    if (r.status === 401 && url !== '/api/login') { showLogin(); throw new Error('login'); }
+    if (!r.ok) throw new Error(j.error || 'Hata');
+    return j;
+  }
+  function showLogin() { $('login').classList.remove('hide'); $('app').classList.add('hide'); $('pw').focus(); }
+  $('loginForm').addEventListener('submit', async e => {
+    e.preventDefault(); $('loginErr').textContent = '';
+    try { const j = await call('/api/login', { password: $('pw').value }); token = j.token; try { sessionStorage.setItem('claw_admin', token); } catch (e) { } $('pw').value = ''; load(); }
+    catch (err) { $('loginErr').textContent = err.message === 'login' ? 'Şifre yanlış' : err.message; }
+  });
+
+  async function load() {
+    try {
+      const j = await call('/api/admin');
+      $('login').classList.add('hide'); $('app').classList.remove('hide');
+      const c = j.config;
+      $('title').value = c.title || ''; $('playSeconds').value = c.playSeconds ?? 15; $('maxPlayers').value = c.maxPlayers ?? 4;
+      $('playsPerPhone').value = c.playsPerPhone ?? 0; $('attractMode').checked = c.attractMode !== false;
+      $('htitle').textContent = (c.title || 'Vinç Oyunu') + ' — Ödül paneli';
+      prizes = (c.prizes || []).map(p => ({ name: p.name, chance: p.chance }));
+      renderPrizes(); status(j); wins = j.wins || []; renderWins(); dirty = false;
+    } catch (e) { if (e.message !== 'login') showLogin(); }
+  }
+  function status(j) {
+    $('scr').className = 'chip ' + (j.screens ? 'on' : 'off'); $('scr').textContent = j.screens ? 'Ekran bağlı' : 'Ekran kapalı';
+    $('ply').textContent = j.players + ' telefon bağlı';
+  }
+  function renderPrizes() {
+    $('prizes').innerHTML = prizes.length ? prizes.map((p, i) => `<div class="prize">
+      <i class="sw" style="background:${COLORS[i % COLORS.length]}"></i>
+      <input type="text" data-i="${i}" data-k="name" value="${esc(p.name)}" placeholder="Ödül adı" maxlength="30" aria-label="Ödül adı">
+      <div class="pct"><input type="number" data-i="${i}" data-k="chance" value="${p.chance}" min="0" max="100" step="0.5" aria-label="Kazanma yüzdesi"><span>%</span></div>
+      <button class="del" type="button" data-del="${i}" aria-label="Ödülü sil">×</button></div>`).join('')
+      : '<div class="empty">Henüz ödül yok. Ödül eklemezsen herkes kaybeder.</div>';
+    summary();
+  }
+  function summary() {
+    const total = prizes.reduce((s, p) => s + (+p.chance || 0), 0), lose = Math.max(0, 100 - total);
+    $('bar').innerHTML = prizes.map((p, i) => `<i style="width:${Math.min(100, +p.chance || 0)}%;background:${COLORS[i % COLORS.length]}"></i>`).join('');
+    $('legend').innerHTML = prizes.map((p, i) => `<span><b style="color:${COLORS[i % COLORS.length]}">■</b> ${esc(p.name || 'Adsız')} <b>%${+p.chance || 0}</b></span>`).join('') + `<span><b style="color:#b7b3cc">■</b> Kaybetme <b>%${Math.round(lose * 10) / 10}</b></span>`;
+    const over = total > 100;
+    $('sum').className = 'sum' + (over ? ' bad' : '');
+    $('sum').textContent = over ? `Toplam %${total}: 100'ü geçemez, yüzdeleri azalt.` : `Her oyunda kazanma ihtimali %${Math.round(total * 10) / 10}. Yani 100 oyunun yaklaşık ${Math.round(total)} tanesi ödül kazanır.`;
+    $('save').disabled = over;
+  }
+  $('prizes').addEventListener('input', e => { const i = e.target.dataset.i; if (i === undefined) return; prizes[i][e.target.dataset.k] = e.target.dataset.k === 'chance' ? +e.target.value : e.target.value; dirty = true; summary(); });
+  $('prizes').addEventListener('click', e => { const i = e.target.dataset.del; if (i === undefined) return; prizes.splice(+i, 1); dirty = true; renderPrizes(); });
+  $('addPrize').onclick = () => { prizes.push({ name: '', chance: 5 }); dirty = true; renderPrizes(); const ins = $('prizes').querySelectorAll('input[data-k=name]'); ins[ins.length - 1]?.focus(); };
+  document.querySelectorAll('#title,#playSeconds,#maxPlayers,#playsPerPhone,#attractMode,#newPassword').forEach(el => el.addEventListener('input', () => dirty = true));
+
+  $('save').onclick = async () => {
+    const m = $('msg'); m.className = 'msg'; m.textContent = 'Kaydediliyor…';
+    try {
+      const body = { title: $('title').value, playSeconds: $('playSeconds').value, maxPlayers: $('maxPlayers').value, playsPerPhone: $('playsPerPhone').value, attractMode: $('attractMode').checked, prizes: prizes.filter(p => String(p.name).trim()), newPassword: $('newPassword').value };
+      await call('/api/admin', body);
+      $('newPassword').value = ''; dirty = false;
+      m.className = 'msg ok'; m.textContent = 'Kaydedildi, ekrana uygulandı.';
+      load();
+    } catch (e) { if (e.message !== 'login') { m.className = 'msg bad'; m.textContent = e.message; } }
+  };
+
+  function renderWins() {
+    const q = $('find').value.trim().toLowerCase();
+    const list = wins.filter(w => !q || (w.code + ' ' + w.name + ' ' + w.prize).toLowerCase().includes(q));
+    $('wins').innerHTML = list.length ? list.map(w => `<tr><td class="code">${esc(w.code)}</td><td>${esc(w.prize)}</td><td>${esc(w.name)}</td><td class="t">${esc(w.time)}</td></tr>`).join('')
+      : `<tr><td colspan="4" class="empty">${wins.length ? 'Eşleşen kayıt yok' : 'Henüz kazanan yok'}</td></tr>`;
+  }
+  $('find').addEventListener('input', renderWins);
+  $('dl').onclick = () => {
+    const csv = '﻿Zaman;İsim;Ödül;Kod\n' + wins.map(w => [w.time, w.name, w.prize, w.code].map(v => String(v).replace(/;/g, ',')).join(';')).join('\n');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); a.download = 'kazananlar.csv'; a.click();
+  };
+  $('clear').onclick = async () => {
+    if ($('clear').dataset.sure !== '1') { $('clear').dataset.sure = '1'; $('clear').textContent = 'Emin misin? Tekrar bas'; setTimeout(() => { $('clear').dataset.sure = ''; $('clear').textContent = 'Listeyi temizle'; }, 3000); return; }
+    await call('/api/wins/clear', {}); $('clear').dataset.sure = ''; $('clear').textContent = 'Listeyi temizle'; wins = []; renderWins();
+  };
+  // kazananları ve bağlantı durumunu canlı tut (düzenlemeyi bozmadan)
+  setInterval(async () => { if ($('app').classList.contains('hide')) return; try { const j = await call('/api/admin'); status(j); wins = j.wins || []; renderWins(); } catch (e) { } }, 4000);
+  addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+  if (token) load(); else showLogin();
+}
+</script>
+</body>
+</html>
