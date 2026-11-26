@@ -90,14 +90,12 @@
     return mix(mix(mix(h3(i),h3(i+vec3(1,0,0)),f.x),mix(h3(i+vec3(0,1,0)),h3(i+vec3(1,1,0)),f.x),f.y),
                mix(mix(h3(i+vec3(0,0,1)),h3(i+vec3(1,0,1)),f.x),mix(h3(i+vec3(0,1,1)),h3(i+vec3(1,1,1)),f.x),f.y),f.z); }
   float fbm(vec3 p){ float a=.5,s=0.; for(int i=0;i<5;i++){ s+=a*n3(p); p*=2.03; a*=.5; } return s; }
-  vec3 env(vec3 d){ // neon gece ortamı: karanlık, pembe-camgöbeği neon şeritler
-    vec3 c = mix(vec3(.010,.008,.025), vec3(.05,.03,.12), smoothstep(-.4,.6,d.y));
-    c += vec3(1.6,1.4,2.2)*smoothstep(.86,.97,d.y);                                         // tavan paneli
-    c += vec3(2.6,.25,1.5)*smoothstep(.80,.95,-d.x)*smoothstep(-.2,.4,d.y);                 // sol neon (pembe)
-    c += vec3(.15,1.9,2.6)*smoothstep(.80,.95, d.x)*smoothstep(-.2,.4,d.y);                 // sağ neon (camgöbeği)
-    float f = smoothstep(.55,.9,d.z)*smoothstep(.0,.25,d.y)*smoothstep(.6,.3,abs(d.x));
-    c += vec3(.9,.6,1.6)*f;                                                                 // ön mor ışık
-    c += vec3(.6,.2,1.2)*smoothstep(-.5,-.85,d.y);                                          // zemin parıltısı
+  vec3 env(vec3 d){
+    vec3 c = mix(vec3(.10,.10,.17), vec3(.42,.45,.70), smoothstep(-.35,.55,d.y));
+    c += vec3(2.4,2.4,2.6)*smoothstep(.72,.93,d.y);                                   // tavan ışık paneli
+    float f = smoothstep(.45,.85,d.z)*smoothstep(-.30,.20,d.y)*smoothstep(.75,.35,abs(d.x));
+    c += vec3(1.05,1.08,1.25)*f;                                                     // ön (izleyici tarafı) ışık
+    c += vec3(.35,.40,.85)*smoothstep(.75,.97,abs(d.x))*smoothstep(-.1,.5,d.y);       // yan ışık şeritleri
     return c;
   }
   float shadow(){
@@ -120,16 +118,21 @@
       alb = mix(alb*vec3(.50,.58,.92), alb, groove);
       N = normalize(N + normalize(vT)*cos(ang*k)*sign(s)*(1.0-groove)*1.3);
       rough = mix(.55, rough, groove);
-    } else if(pat > 1.5 && pat < 4.5){ // koyu parlak panel + ince ızgara
+    } else if(pat > 1.5 && pat < 2.5 || pat > 3.5 && pat < 4.5){ // beton
       vec3 q = vW;
-      float n = fbm(q*3.0)*.5 + n3(q*30.0)*.15;
-      alb *= .75 + .35*n;
-      vec2 gp = (abs(N.y)>.9 ? q.xz : abs(N.x)>.9 ? q.zy : q.xy)/.5;
-      vec2 gg = abs(fract(gp)-.5);
-      float line = smoothstep(.485,.497,max(gg.x,gg.y));
-      alb = mix(alb, alb*.35, line);
-      emis += line*.0;
-      rough = mix(rough, .9, line);
+      float n = fbm(q*2.2)*.6 + fbm(q*9.0)*.3 + n3(q*40.0)*.12;
+      alb *= .80 + .32*n;
+      float pits = smoothstep(.80,.88, n3(q*31.0+7.0)); alb *= 1.0 - pits*.22;
+      // kalıp bağlantı delikleri (beton duvar dokusu)
+      vec2 cell = q.xy/vec2(.95,.62); vec2 g = fract(cell)-.5; float hole = smoothstep(.045,.03,length(g*vec2(.95,.62)));
+      if(abs(N.z)>.9) alb *= 1.0 - hole*.45;
+      if(pat > 3.5){ // başlık yazısı — kazınmış harfler
+        vec2 uv = (vW.xy - uTitleRect.xy)/uTitleRect.zw; uv.y = 1.0-uv.y;
+        if(uv.x>0.&&uv.x<1.&&uv.y>0.&&uv.y<1.){
+          float a = texture(uTitle, uv).a, b = texture(uTitle, uv+vec2(0.0,.012)).a, c2 = texture(uTitle, uv-vec2(0.0,.012)).a;
+          alb *= 1.0 - a*.38; alb += (c2-a)*.18; alb -= max(b-a,0.0)*.12;
+        }
+      }
     } else if(pat > 5.5 && pat < 6.5){ wrap = .8; } // bulut — yumuşak
     float NdV = max(dot(N,V),1e-3);
     vec3 L = normalize(uLDir), H = normalize(L+V);
@@ -143,18 +146,15 @@
     vec3 F = F0 + (1.0-F0)*pow(1.0-max(dot(H,V),0.0),5.0);
     vec3 spec = D*Gs*F/(4.0*NdV*max(NdL,0.0)+1e-3) * max(NdL,0.0);
     if(pat < 1.5 || pat > 5.5 || (pat>4.5 && pat<5.5)) ao *= mix(.42,1.0,smoothstep(-.85,.55,N.y)); // temas gölgesi
-    vec3 sky = vec3(.20,.16,.42), gnd = vec3(.10,.04,.14);
+    vec3 sky = vec3(.50,.53,.85), gnd = vec3(.10,.09,.16);
     vec3 hemi = mix(gnd, sky, N.y*.5+.5);
     vec3 R = reflect(-V,N);
     vec3 envc = mix(env(R), hemi, clamp(rough*1.3,0.0,1.0));
     vec3 Fe = F0 + (max(vec3(1.0-rough),F0)-F0)*pow(1.0-NdV,5.0);
-    vec3 lc = vec3(1.35,1.25,1.6);
-    // yan neon ışıklar (gölgesiz, renkli kenar ışığı)
-    vec3 Lp = normalize(vec3(-1.0,.35,.45)), Lc = normalize(vec3(1.0,.35,.45));
-    vec3 neon = vec3(1.7,.18,.95)*max(dot(N,Lp)*.8+.2,0.0) + vec3(.12,1.15,1.7)*max(dot(N,Lc)*.8+.2,0.0);
-    vec3 col = alb*(1.0-metal)*(diff*lc*sh*.8 + hemi*.35 + neon*.22)*ao + spec*lc*sh + envc*Fe*mix(ao,1.0,.35) + alb*emis;
+    vec3 lc = vec3(1.55,1.52,1.62);
+    vec3 col = alb*(1.0-metal)*(diff*lc*sh*.85 + hemi*.42)*ao + spec*lc*sh + envc*Fe*mix(ao,1.0,.35) + alb*emis;
     // derinlik: dolabın gerisi biraz koyulaşır
-    col *= mix(.6, 1.0, smoothstep(-uBox.z, uBox.z, vW.z));
+    col *= mix(.72, 1.0, smoothstep(-uBox.z, uBox.z, vW.z));
     o = vec4(col, 1.0);
   }`;
   const VS_SH = `#version 300 es
