@@ -25,14 +25,26 @@ function playURL() {
   const base = process.env.PUBLIC_URL || cfg.publicUrl || `http://${lanIP()}:${PORT}`;
   return base.replace(/\/$/, '') + '/play';
 }
-function readConfig() { try { return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')); } catch (e) { return {}; } }
+function readConfig() {
+  let c = {}; try { c = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')); } catch (e) { }
+  c.prizes = (c.prizes || []).map(p => ({ name: String(p.name || ''), chance: p.chance !== undefined ? +p.chance : +(p.weight || 0) }));
+  if (!c.adminPassword) c.adminPassword = '1234';
+  return c;
+}
+function publicConfig() { const c = readConfig(); delete c.adminPassword; return c; }
+const WINS_FILE = path.join(__dirname, 'kazananlar.csv');
+const wins = [];
+try { fs.readFileSync(WINS_FILE, 'utf8').trim().split('\n').slice(1).forEach(l => { const [time, name, prize, code] = l.split(';'); if (time) wins.unshift({ time, name, prize, code }); }); } catch (e) { }
+const tokens = new Set();
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.woff2': 'font/woff2' };
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
   let p = url.pathname;
-  if (p === '/info') return send(res, 200, JSON.stringify({ playUrl: playURL(), config: readConfig() }), MIME['.json']);
+  if (p === '/info') return send(res, 200, JSON.stringify({ playUrl: playURL(), config: publicConfig() }), MIME['.json']);
+  if (p.startsWith('/api/')) return api(req, res, p);
+  if (p === '/admin' || p === '/panel') p = '/admin.html';
   if (p === '/' || p === '/screen') p = '/screen.html';
   if (p === '/play' || p === '/p') p = '/controller.html';
   const file = path.normalize(path.join(PUBLIC, p));
@@ -42,6 +54,37 @@ const server = http.createServer((req, res) => {
     send(res, 200, data, MIME[path.extname(file)] || 'application/octet-stream');
   });
 });
+// ---------- Yönetim paneli API ----------
+function readBody(req) { return new Promise(ok => { let b = ''; req.on('data', d => { b += d; if (b.length > 65536) req.destroy(); }); req.on('end', () => { try { ok(JSON.parse(b || '{}')); } catch (e) { ok({}); } }); }); }
+async function api(req, res, p) {
+  const json = (code, obj) => send(res, code, JSON.stringify(obj), MIME['.json']);
+  if (p === '/api/login' && req.method === 'POST') {
+    const b = await readBody(req);
+    if (String(b.password || '') !== String(readConfig().adminPassword)) { await new Promise(r => setTimeout(r, 600)); return json(401, { error: 'Şifre yanlış' }); }
+    const t = crypto.randomBytes(16).toString('hex'); tokens.add(t); return json(200, { token: t });
+  }
+  if (!tokens.has(req.headers['x-token'])) return json(401, { error: 'Giriş gerekli' });
+  if (p === '/api/admin' && req.method === 'GET') return json(200, { config: publicConfig(), wins: wins.slice(0, 300), playUrl: playURL(), screens: screens.size, players: players.size });
+  if (p === '/api/admin' && req.method === 'POST') {
+    const b = await readBody(req), c = readConfig(), int = (v, a, z, d) => { v = Math.round(+v); return isFinite(v) ? Math.max(a, Math.min(z, v)) : d; };
+    c.title = String(b.title ?? c.title ?? '').slice(0, 30);
+    c.playSeconds = int(b.playSeconds, 5, 60, 15);
+    c.maxPlayers = int(b.maxPlayers, 1, 6, 4);
+    c.playsPerPhone = int(b.playsPerPhone, 0, 99, 0);
+    c.attractMode = !!b.attractMode;
+    const prizes = (Array.isArray(b.prizes) ? b.prizes : []).slice(0, 20).map(x => ({ name: String(x.name || '').trim().slice(0, 30), chance: Math.max(0, Math.min(100, Math.round((+x.chance || 0) * 10) / 10)) })).filter(x => x.name);
+    if (prizes.reduce((s, x) => s + x.chance, 0) > 100.001) return json(400, { error: 'Yüzdelerin toplamı 100\'ü geçemez' });
+    c.prizes = prizes;
+    if (b.newPassword) { if (String(b.newPassword).length < 4) return json(400, { error: 'Yeni şifre en az 4 karakter olmalı' }); c.adminPassword = String(b.newPassword).slice(0, 40); }
+    delete c.winRate; delete c.grandPrize;
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(c, null, 2));
+    toScreens({ t: 'config', config: publicConfig() });
+    log('Ayarlar panelden güncellendi');
+    return json(200, { ok: true, config: publicConfig() });
+  }
+  if (p === '/api/wins/clear' && req.method === 'POST') { wins.length = 0; try { fs.unlinkSync(WINS_FILE); } catch (e) { } return json(200, { ok: true }); }
+  json(404, { error: 'yok' });
+}
 function send(res, code, body, type = 'text/plain; charset=utf-8') {
   res.writeHead(code, { 'Content-Type': type, 'Cache-Control': 'no-store' }); res.end(body);
 }
@@ -99,7 +142,7 @@ const toScreens = obj => screens.forEach(s => wsSend(s, obj));
 function onOpen(c, url) {
   if (c.role === 'screen') {
     screens.add(c);
-    wsSend(c, { t: 'hello', playUrl: playURL(), config: readConfig(), players: [...players.keys()] });
+    wsSend(c, { t: 'hello', playUrl: playURL(), config: publicConfig(), players: [...players.keys()] });
     players.forEach(p => wsSend(p, { t: 'reset' }));
     log('LED ekran bağlandı');
   } else {
@@ -116,6 +159,12 @@ function onMessage(c, m) {
   if (c.role === 'screen') {
     if (m.t === 'to' && m.pid) wsSend(players.get(m.pid), m.msg);
     else if (m.t === 'all') players.forEach(p => wsSend(p, m.msg));
+    else if (m.t === 'win') {
+      const w = { time: new Date().toLocaleString('tr-TR'), name: String(m.name || '').replace(/[;\n]/g, ' ').slice(0, 14) || '-', prize: String(m.prize || '').replace(/[;\n]/g, ' ').slice(0, 30), code: String(m.code || '').slice(0, 6) };
+      wins.unshift(w); if (wins.length > 2000) wins.pop();
+      try { if (!fs.existsSync(WINS_FILE)) fs.writeFileSync(WINS_FILE, '\ufeffZaman;Isim;Odul;Kod\n'); fs.appendFileSync(WINS_FILE, [w.time, w.name, w.prize, w.code].join(';') + '\n'); } catch (e) { }
+      log('KAZANAN', w.name, '—', w.prize, '— kod', w.code);
+    }
     return;
   }
   if (!c.pid) return;
@@ -138,5 +187,6 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log('\n  ==== VİNÇ OYUNU HAZIR ====');
   console.log('  LED ekran  : http://localhost:' + PORT + '/   (F = tam ekran)');
   console.log('  Telefonlar : ' + playURL() + '   (QR ekranda)');
+  console.log('  Ödül paneli: http://localhost:' + PORT + '/admin   (ilk şifre: 1234)');
   console.log('  Telefonlar ile bu bilgisayar aynı Wi-Fi ağında olmalı.\n');
 });

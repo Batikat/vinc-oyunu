@@ -1,17 +1,15 @@
 {
   "title": "LUCKY CLAW",
-  "joinText": "QR'ı okut, 15 saniyede ödülünü kap!",
   "playSeconds": 15,
   "maxPlayers": 4,
-  "winRate": 0.35,
   "playsPerPhone": 0,
   "attractMode": true,
   "qrSize": 0.15,
   "prizes": [
-    { "name": "Kahve İkramı", "weight": 6 },
-    { "name": "Sticker Seti", "weight": 4 },
-    { "name": "Bez Çanta", "weight": 2 }
+    { "name": "Kahve İkramı", "chance": 15 },
+    { "name": "Sticker Seti", "chance": 12 },
+    { "name": "Bez Çanta", "chance": 5 }
   ],
-  "grandPrize": "BÜYÜK ÖDÜL",
+  "adminPassword": "1234",
   "publicUrl": ""
 }
